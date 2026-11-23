@@ -66,7 +66,8 @@ Resumen estado: {
     gastadoTotal: '3000000'
   }
 }
-###  Capturas de Pantalla (Evidencia Visual)
+```
+### 3. Capturas de Pantalla (Evidencia Visual)
 
 #### Wallet Activa y Balance en Devnet
 ![Wallet Activa](docs/walletActiva.png)
@@ -79,3 +80,7 @@ Resumen estado: {
 
 #### Transacciones Confirmadas en Devnet
 ![Transacciones](docs/transaccionesSolana_2.png)
+
+
+
+
