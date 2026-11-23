@@ -1,472 +1,389 @@
 /*
-FLORERIA
+SALON DE BELLEZA
 
 Proposito:
-- Gestionar una floreria por owner (PDA unica por propietario).
-- Administrar productos y clientes, y registrar ventas simples.
-- Acceso: solo el owner puede mutar estado (check en handlers).
+- Gestionar un salon de belleza por owner (PDA unica por propietario).
+- Administrar servicios (cortes, peinados, manicure, etc.) y clientes, y registrar atenciones.
+- Acceso: solo el owner puede mutar estado (check en handlers y constraints).
 
 Modelo:
-- Floreria { owner: Pubkey, nombre: String(max 60), productos: Vec<Producto>(cap 40), clientes: Vec<Cliente>(cap 100) }
-- Producto { nombre: String(max 60), precio: u64(lamports), stock: u32, disponible: bool }
-- Cliente  { nombre: String(max 60), compras: u32, gastado_total: u64(lamports) }
+- SalonBelleza { owner: Pubkey, nombre: String(max 60), servicios: Vec<Servicio>(cap 40), clientes: Vec<Cliente>(cap 40) }
+- Servicio { nombre: String(max 60), precio: u64(lamports), realizados: u32, disponible: bool }
+- Cliente  { nombre: String(max 60), visitas: u32, gastado_total: u64(lamports) }
 
 PDA:
-- seeds = ["floreria", owner] (direccion deterministica por propietario)
-
-Instrucciones:
-- crear_floreria(owner, nombre) -> crea PDA si no existe
-- agregar_producto(owner, nombre, precio, stock)
-- eliminar_producto(owner, nombre)
-- alterar_producto(owner, nombre)           // toggle disponible
-- actualizar_precio(owner, nombre, precio)
-- actualizar_stock(owner, nombre, stock)
-- registrar_cliente(owner, nombre)
-- registrar_venta(owner, cliente_nombre, producto_nombre, cantidad)
-
-Eventos:
-- ProductoAgregado, ProductoEliminado, ProductoAlterado
-- ProductoPrecioActualizado, ProductoStockActualizado
-- ClienteRegistrado, VentaRegistrada
-
-Validaciones clave:
-- nombre <= 60, productos <= 40, clientes <= 100
-- precio > 0, cantidad > 0, stock suficiente
-- total = precio * cantidad con checked_mul (evita overflow)
-
-Nota cliente (Playground):
-- Derivar PDA con mismas seeds; antes de crear, hacer getAccountInfo y
-  omitir crear_floreria si la cuenta ya existe para evitar "already in use".
+- seeds = ["salon_belleza", owner] (direccion deterministica por propietario)
 */
 
 use anchor_lang::prelude::*;
 
-declare_id!("34Vrx8KBRxaRmDEFSwVU5n9ZGxhCpHTCWkJoPRJBFUMU");
+// Recuerda reemplazar este ID con el que te genere Solana Playground al hacer Build
+declare_id!("11111111111111111111111111111111");
 
 #[program]
-pub mod floreria {
+pub mod salon_belleza {
     use super::*;
 
-    /// Crea la florería (PDA).
-    pub fn crear_floreria(ctx: Context<NuevaFloreria>, nombre: String) -> Result<()> {
+    /// Crea el salón de belleza (PDA).
+    pub fn crear_salon(ctx: Context<NuevoSalon>, nombre: String) -> Result<()> {
         if nombre.len() > 60 {
             return Err(Errores::NombreMuyLargo.into());
         }
 
         let owner_id = ctx.accounts.owner.key();
-        ctx.accounts.floreria.set_inner(Floreria {
+        ctx.accounts.salon.set_inner(SalonBelleza {
             owner: owner_id,
             nombre,
-            productos: Vec::new(),
+            servicios: Vec::new(),
             clientes: Vec::new(),
         });
         Ok(())
     }
 
-    // -------- Productos --------
+    // -------- Servicios --------
 
-    /// Agrega un producto (precio > 0, cap 40).
-    pub fn agregar_producto(
-        ctx: Context<AccesoFloreria>,
+    /// Agrega un servicio (precio > 0, cap 40).
+    pub fn agregar_servicio(
+        ctx: Context<AccesoSalon>,
         nombre: String,
         precio: u64,
-        stock: u32,
     ) -> Result<()> {
-        if ctx.accounts.floreria.owner != ctx.accounts.owner.key() {
+        if ctx.accounts.salon.owner != ctx.accounts.owner.key() {
             return Err(Errores::NoEresOwner.into());
         }
         if nombre.len() > 60 {
             return Err(Errores::NombreMuyLargo.into());
         }
-        if ctx.accounts.floreria.productos.len() >= 40 {
-            return Err(Errores::CapacidadDeProductosLlena.into());
+        if ctx.accounts.salon.servicios.len() >= 40 {
+            return Err(Errores::CapacidadDeServiciosLlena.into());
         }
         if precio == 0 {
             return Err(Errores::PrecioInvalido.into());
         }
 
-        ctx.accounts.floreria.productos.push(Producto {
+        ctx.accounts.salon.servicios.push(Servicio {
             nombre: nombre.clone(),
             precio,
-            stock,
+            realizados: 0,
             disponible: true,
         });
 
         let ts = Clock::get()?.unix_timestamp;
-        emit!(ProductoAgregado {
-            floreria: ctx.accounts.floreria.key(),
+        emit!(ServicioAgregado {
+            salon: ctx.accounts.salon.key(),
             owner: ctx.accounts.owner.key(),
             nombre,
             precio,
-            stock,
             timestamp: ts,
         });
         Ok(())
     }
 
-    /// Elimina un producto por nombre.
-    pub fn eliminar_producto(ctx: Context<AccesoFloreria>, nombre: String) -> Result<()> {
-        if ctx.accounts.floreria.owner != ctx.accounts.owner.key() {
+    /// Elimina un servicio por nombre.
+    pub fn eliminar_servicio(ctx: Context<AccesoSalon>, nombre: String) -> Result<()> {
+        if ctx.accounts.salon.owner != ctx.accounts.owner.key() {
             return Err(Errores::NoEresOwner.into());
         }
 
-        let productos = &mut ctx.accounts.floreria.productos;
-        if let Some(idx) = productos.iter().position(|p| p.nombre == nombre) {
-            productos.remove(idx);
+        let servicios = &mut ctx.accounts.salon.servicios;
+        if let Some(idx) = servicios.iter().position(|s| s.nombre == nombre) {
+            servicios.remove(idx);
 
             let ts = Clock::get()?.unix_timestamp;
-            emit!(ProductoEliminado {
-                floreria: ctx.accounts.floreria.key(),
+            emit!(ServicioEliminado {
+                salon: ctx.accounts.salon.key(),
                 owner: ctx.accounts.owner.key(),
                 nombre,
-                timestamp: ts
+                timestamp: ts,
             });
             Ok(())
         } else {
-            Err(Errores::ProductoNoExiste.into())
+            Err(Errores::ServicioNoExiste.into())
         }
     }
 
-    /// Alterna disponibilidad del producto.
-    pub fn alterar_producto(ctx: Context<AccesoFloreria>, nombre: String) -> Result<()> {
-        if ctx.accounts.floreria.owner != ctx.accounts.owner.key() {
+    /// Alterna disponibilidad del servicio (ej. estilista ausente o sin insumos).
+    pub fn alterar_servicio(ctx: Context<AccesoSalon>, nombre: String) -> Result<()> {
+        if ctx.accounts.salon.owner != ctx.accounts.owner.key() {
             return Err(Errores::NoEresOwner.into());
         }
 
-        let productos = &mut ctx.accounts.floreria.productos;
-        if let Some(idx) = productos.iter().position(|p| p.nombre == nombre) {
-            let nuevo = !productos[idx].disponible;
-            productos[idx].disponible = nuevo;
+        let servicios = &mut ctx.accounts.salon.servicios;
+        if let Some(idx) = servicios.iter().position(|s| s.nombre == nombre) {
+            let nuevo = !servicios[idx].disponible;
+            servicios[idx].disponible = nuevo;
 
             let ts = Clock::get()?.unix_timestamp;
-            emit!(ProductoAlterado {
-                floreria: ctx.accounts.floreria.key(),
+            emit!(ServicioAlterado {
+                salon: ctx.accounts.salon.key(),
                 owner: ctx.accounts.owner.key(),
                 nombre,
                 disponible: nuevo,
-                timestamp: ts
+                timestamp: ts,
             });
             Ok(())
         } else {
-            Err(Errores::ProductoNoExiste.into())
+            Err(Errores::ServicioNoExiste.into())
         }
     }
 
-    /// Actualiza precio (lamports > 0).
+    /// Actualiza el precio del servicio (lamports > 0).
     pub fn actualizar_precio(
-        ctx: Context<AccesoFloreria>,
+        ctx: Context<AccesoSalon>,
         nombre: String,
         nuevo_precio: u64,
     ) -> Result<()> {
-        if ctx.accounts.floreria.owner != ctx.accounts.owner.key() {
+        if ctx.accounts.salon.owner != ctx.accounts.owner.key() {
             return Err(Errores::NoEresOwner.into());
         }
         if nuevo_precio == 0 {
             return Err(Errores::PrecioInvalido.into());
         }
 
-        let productos = &mut ctx.accounts.floreria.productos;
-        if let Some(p) = productos.iter_mut().find(|p| p.nombre == nombre) {
-            p.precio = nuevo_precio;
+        let servicios = &mut ctx.accounts.salon.servicios;
+        if let Some(s) = servicios.iter_mut().find(|s| s.nombre == nombre) {
+            s.precio = nuevo_precio;
 
             let ts = Clock::get()?.unix_timestamp;
-            emit!(ProductoPrecioActualizado {
-                floreria: ctx.accounts.floreria.key(),
+            emit!(ServicioPrecioActualizado {
+                salon: ctx.accounts.salon.key(),
                 owner: ctx.accounts.owner.key(),
                 nombre,
                 precio: nuevo_precio,
-                timestamp: ts
+                timestamp: ts,
             });
             Ok(())
         } else {
-            Err(Errores::ProductoNoExiste.into())
-        }
-    }
-
-    /// Establece el stock (u32).
-    pub fn actualizar_stock(
-        ctx: Context<AccesoFloreria>,
-        nombre: String,
-        nuevo_stock: u32,
-    ) -> Result<()> {
-        if ctx.accounts.floreria.owner != ctx.accounts.owner.key() {
-            return Err(Errores::NoEresOwner.into());
-        }
-
-        let productos = &mut ctx.accounts.floreria.productos;
-        if let Some(p) = productos.iter_mut().find(|p| p.nombre == nombre) {
-            p.stock = nuevo_stock;
-
-            let ts = Clock::get()?.unix_timestamp;
-            emit!(ProductoStockActualizado {
-                floreria: ctx.accounts.floreria.key(),
-                owner: ctx.accounts.owner.key(),
-                nombre,
-                stock: nuevo_stock,
-                timestamp: ts
-            });
-            Ok(())
-        } else {
-            Err(Errores::ProductoNoExiste.into())
+            Err(Errores::ServicioNoExiste.into())
         }
     }
 
     // -------- Clientes --------
 
     /// Registra un cliente (cap 40).
-    pub fn registrar_cliente(ctx: Context<AccesoFloreria>, nombre: String) -> Result<()> {
-        if ctx.accounts.floreria.owner != ctx.accounts.owner.key() {
+    pub fn registrar_cliente(ctx: Context<AccesoSalon>, nombre: String) -> Result<()> {
+        if ctx.accounts.salon.owner != ctx.accounts.owner.key() {
             return Err(Errores::NoEresOwner.into());
         }
         if nombre.len() > 60 {
             return Err(Errores::NombreMuyLargo.into());
         }
-        if ctx.accounts.floreria.clientes.len() >= 40 {
+        if ctx.accounts.salon.clientes.len() >= 40 {
             return Err(Errores::CapacidadDeClientesLlena.into());
         }
 
-        ctx.accounts.floreria.clientes.push(Cliente {
+        ctx.accounts.salon.clientes.push(Cliente {
             nombre: nombre.clone(),
-            compras: 0,
+            visitas: 0,
             gastado_total: 0,
         });
 
         let ts = Clock::get()?.unix_timestamp;
         emit!(ClienteRegistrado {
-            floreria: ctx.accounts.floreria.key(),
+            salon: ctx.accounts.salon.key(),
             owner: ctx.accounts.owner.key(),
             nombre,
-            timestamp: ts
+            timestamp: ts,
         });
         Ok(())
     }
 
-    // -------- Ventas --------
+    // -------- Atenciones / Ventas --------
 
-    /// Registra venta (baja stock y acumula metricas).
-pub fn registrar_venta(
-    ctx: Context<AccesoFloreria>,
-    cliente_nombre: String,
-    producto_nombre: String,
-    cantidad: u16,
-) -> Result<()> {
-    // Control de acceso
-    if ctx.accounts.floreria.owner != ctx.accounts.owner.key() {
-        return Err(Errores::NoEresOwner.into());
-    }
-    if cantidad == 0 {
-        return Err(Errores::CantidadInvalida.into());
-    }
-
-    // Capturar llaves por valor (no mantiene prestamos)
-    let floreria_key = ctx.accounts.floreria.key();
-    let owner_key = ctx.accounts.owner.key();
-
-    // Buscar indices sin tomar prestamos mutables largos
-    let cliente_idx = ctx
-        .accounts
-        .floreria
-        .clientes
-        .iter()
-        .position(|c| c.nombre == cliente_nombre)
-        .ok_or(Errores::ClienteNoExiste)?;
-
-    let producto_idx = ctx
-        .accounts
-        .floreria
-        .productos
-        .iter()
-        .position(|p| p.nombre == producto_nombre)
-        .ok_or(Errores::ProductoNoExiste)?;
-
-    // Chequeos con prestamo inmutable corto
-    let precio_unitario: u64 = {
-        let p_ref = &ctx.accounts.floreria.productos[producto_idx];
-        if !p_ref.disponible {
-            return Err(Errores::ProductoNoExiste.into());
+    /// Registra una atención (incrementa contador de servicios realizados y métricas del cliente).
+    pub fn registrar_atencion(
+        ctx: Context<AccesoSalon>,
+        cliente_nombre: String,
+        servicio_nombre: String,
+        cantidad: u16,
+    ) -> Result<()> {
+        if ctx.accounts.salon.owner != ctx.accounts.owner.key() {
+            return Err(Errores::NoEresOwner.into());
         }
-        if p_ref.stock < cantidad as u32 {
-            return Err(Errores::StockInsuficiente.into());
+        if cantidad == 0 {
+            return Err(Errores::CantidadInvalida.into());
         }
-        p_ref.precio
-    };
 
-    // Calculo de total (con overflow checks)
-    let total_u128 = (precio_unitario as u128)
-        .checked_mul(cantidad as u128)
-        .ok_or(Errores::MontoOverflow)?;
-    if total_u128 > u64::MAX as u128 {
-        return Err(Errores::MontoOverflow.into());
-    }
-    let total = total_u128 as u64;
+        let salon_key = ctx.accounts.salon.key();
+        let owner_key = ctx.accounts.owner.key();
 
-    // Mutar producto en un bloque separado
-    {
-        let p_mut = &mut ctx.accounts.floreria.productos[producto_idx];
-        p_mut.stock = p_mut
-            .stock
-            .checked_sub(cantidad as u32)
-            .ok_or(Errores::StockInsuficiente)?;
-    }
+        let cliente_idx = ctx
+            .accounts
+            .salon
+            .clientes
+            .iter()
+            .position(|c| c.nombre == cliente_nombre)
+            .ok_or(Errores::ClienteNoExiste)?;
 
-    // Mutar cliente en otro bloque (prestamo anterior ya termino)
-    {
-        let c_mut = &mut ctx.accounts.floreria.clientes[cliente_idx];
-        c_mut.compras = c_mut.compras.saturating_add(1);
-        c_mut.gastado_total = c_mut.gastado_total.saturating_add(total);
-    }
+        let servicio_idx = ctx
+            .accounts
+            .salon
+            .servicios
+            .iter()
+            .position(|s| s.nombre == servicio_nombre)
+            .ok_or(Errores::ServicioNoExiste)?;
 
-    // Evento (usa llaves capturadas y valores escalares)
-    let ts = Clock::get()?.unix_timestamp;
-    emit!(VentaRegistrada {
-        floreria: floreria_key,
-        owner: owner_key,
-        cliente_nombre,
-        producto_nombre,
-        cantidad,
-        precio_unitario,
-        total,
-        timestamp: ts
-    });
+        let precio_unitario: u64 = {
+            let s_ref = &ctx.accounts.salon.servicios[servicio_idx];
+            if !s_ref.disponible {
+                return Err(Errores::ServicioNoDisponible.into());
+            }
+            s_ref.precio
+        };
 
-    Ok(())
-}
+        let total_u128 = (precio_unitario as u128)
+            .checked_mul(cantidad as u128)
+            .ok_or(Errores::MontoOverflow)?;
+        if total_u128 > u64::MAX as u128 {
+            return Err(Errores::MontoOverflow.into());
+        }
+        let total = total_u128 as u64;
 
-    // -------- Lecturas --------
+        // Actualizar estadísticas del servicio
+        {
+            let s_mut = &mut ctx.accounts.salon.servicios[servicio_idx];
+            s_mut.realizados = s_mut.realizados.saturating_add(cantidad as u32);
+        }
 
-    /// Log: total de productos.
-    pub fn leer_productos(ctx: Context<LecturaFloreria>) -> Result<()> {
-        let count = ctx.accounts.floreria.productos.len();
-        msg!("Total de productos: {}", count);
+        // Actualizar métricas del cliente
+        {
+            let c_mut = &mut ctx.accounts.salon.clientes[cliente_idx];
+            c_mut.visitas = c_mut.visitas.saturating_add(1);
+            c_mut.gastado_total = c_mut.gastado_total.saturating_add(total);
+        }
+
+        let ts = Clock::get()?.unix_timestamp;
+        emit!(AtencionRegistrada {
+            salon: salon_key,
+            owner: owner_key,
+            cliente_nombre,
+            servicio_nombre,
+            cantidad,
+            precio_unitario,
+            total,
+            timestamp: ts,
+        });
+
         Ok(())
     }
 
-    /// Log: total de clientes.
-    pub fn leer_clientes(ctx: Context<LecturaFloreria>) -> Result<()> {
-        let count = ctx.accounts.floreria.clientes.len();
-        msg!("Total de clientes: {}", count);
+    // -------- Lecturas --------
+
+    pub fn leer_servicios(ctx: Context<LecturaSalon>) -> Result<()> {
+        let count = ctx.accounts.salon.servicios.len();
+        msg!("Total de servicios en catálogo: {}", count);
+        Ok(())
+    }
+
+    pub fn leer_clientes(ctx: Context<LecturaSalon>) -> Result<()> {
+        let count = ctx.accounts.salon.clientes.len();
+        msg!("Total de clientes registrados: {}", count);
         Ok(())
     }
 }
 
 #[error_code]
 pub enum Errores {
-    #[msg("no eres el propietario de esa cuenta")]
+    #[msg("No eres el propietario de este salón")]
     NoEresOwner,
-    #[msg("no existe ese producto")]
-    ProductoNoExiste,
-    #[msg("no existe ese cliente")]
+    #[msg("El servicio no existe")]
+    ServicioNoExiste,
+    #[msg("El servicio no está disponible actualmente")]
+    ServicioNoDisponible,
+    #[msg("El cliente no existe")]
     ClienteNoExiste,
-    #[msg("capacidad máxima de productos alcanzada")]
-    CapacidadDeProductosLlena,
-    #[msg("capacidad máxima de clientes alcanzada")]
+    #[msg("Capacidad máxima de servicios alcanzada")]
+    CapacidadDeServiciosLlena,
+    #[msg("Capacidad máxima de clientes alcanzada")]
     CapacidadDeClientesLlena,
-    #[msg("el nombre excede el máximo permitido")]
+    #[msg("El nombre excede los 60 caracteres")]
     NombreMuyLargo,
-    #[msg("precio inválido")]
+    #[msg("El precio debe ser mayor a 0")]
     PrecioInvalido,
-    #[msg("stock insuficiente")]
-    StockInsuficiente,
-    #[msg("cantidad inválida")]
+    #[msg("La cantidad debe ser mayor a 0")]
     CantidadInvalida,
-    #[msg("overflow en el monto calculado")]
+    #[msg("Overflow en el monto calculado")]
     MontoOverflow,
 }
 
 #[account]
 #[derive(InitSpace)]
-pub struct Floreria {
-    /// Autoridad.
+pub struct SalonBelleza {
     pub owner: Pubkey,
-    /// Nombre ≤ 60.
     #[max_len(60)]
     pub nombre: String,
-    /// Productos (cap 40).
     #[max_len(40)]
-    pub productos: Vec<Producto>,
-    /// Clientes (cap 40).
+    pub servicios: Vec<Servicio>,
     #[max_len(40)]
     pub clientes: Vec<Cliente>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, PartialEq, Debug)]
-pub struct Producto {
-    /// Nombre ≤ 60.
+pub struct Servicio {
     #[max_len(60)]
     pub nombre: String,
-    /// Precio (lamports).
     pub precio: u64,
-    /// Existencias.
-    pub stock: u32,
-    /// Disponible o no.
+    pub realizados: u32,
     pub disponible: bool,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, PartialEq, Debug)]
 pub struct Cliente {
-    /// Nombre ≤ 60.
     #[max_len(60)]
     pub nombre: String,
-    /// # compras.
-    pub compras: u32,
-    /// Total gastado (lamports).
+    pub visitas: u32,
     pub gastado_total: u64,
 }
 
 #[derive(Accounts)]
-pub struct NuevaFloreria<'info> {
-    /// Paga e inicializa.
+pub struct NuevoSalon<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
-    /// PDA de florería.
     #[account(
         init,
         payer = owner,
-        space = Floreria::INIT_SPACE + 8,
-        seeds = [b"floreria", owner.key().as_ref()],
+        space = SalonBelleza::INIT_SPACE + 8,
+        seeds = [b"salon_belleza", owner.key().as_ref()],
         bump
     )]
-    pub floreria: Account<'info, Floreria>,
+    pub salon: Account<'info, SalonBelleza>,
 
     pub system_program: Program<'info, System>,
 }
 
-/// Mutaciones (control por handler).
 #[derive(Accounts)]
-pub struct AccesoFloreria<'info> {
+pub struct AccesoSalon<'info> {
     pub owner: Signer<'info>,
     #[account(mut)]
-    pub floreria: Account<'info, Floreria>,
+    pub salon: Account<'info, SalonBelleza>,
 }
 
-/// Solo lectura.
 #[derive(Accounts)]
-pub struct LecturaFloreria<'info> {
-    pub floreria: Account<'info, Floreria>,
+pub struct LecturaSalon<'info> {
+    pub salon: Account<'info, SalonBelleza>,
 }
 
 #[event]
-pub struct ProductoAgregado {
-    pub floreria: Pubkey,
+pub struct ServicioAgregado {
+    pub salon: Pubkey,
     pub owner: Pubkey,
     pub nombre: String,
     pub precio: u64,
-    pub stock: u32,
     pub timestamp: i64,
 }
 
 #[event]
-pub struct ProductoEliminado {
-    pub floreria: Pubkey,
+pub struct ServicioEliminado {
+    pub salon: Pubkey,
     pub owner: Pubkey,
     pub nombre: String,
     pub timestamp: i64,
 }
 
 #[event]
-pub struct ProductoAlterado {
-    pub floreria: Pubkey,
+pub struct ServicioAlterado {
+    pub salon: Pubkey,
     pub owner: Pubkey,
     pub nombre: String,
     pub disponible: bool,
@@ -474,8 +391,8 @@ pub struct ProductoAlterado {
 }
 
 #[event]
-pub struct ProductoPrecioActualizado {
-    pub floreria: Pubkey,
+pub struct ServicioPrecioActualizado {
+    pub salon: Pubkey,
     pub owner: Pubkey,
     pub nombre: String,
     pub precio: u64,
@@ -483,28 +400,19 @@ pub struct ProductoPrecioActualizado {
 }
 
 #[event]
-pub struct ProductoStockActualizado {
-    pub floreria: Pubkey,
-    pub owner: Pubkey,
-    pub nombre: String,
-    pub stock: u32,
-    pub timestamp: i64,
-}
-
-#[event]
 pub struct ClienteRegistrado {
-    pub floreria: Pubkey,
+    pub salon: Pubkey,
     pub owner: Pubkey,
     pub nombre: String,
     pub timestamp: i64,
 }
 
 #[event]
-pub struct VentaRegistrada {
-    pub floreria: Pubkey,
+pub struct AtencionRegistrada {
+    pub salon: Pubkey,
     pub owner: Pubkey,
     pub cliente_nombre: String,
-    pub producto_nombre: String,
+    pub servicio_nombre: String,
     pub cantidad: u16,
     pub precio_unitario: u64,
     pub total: u64,
