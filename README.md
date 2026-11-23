@@ -79,7 +79,7 @@ Resumen estado: {
 ![Test](docs/testSalon.png)
 
 #### Transacciones Confirmadas en Devnet
-![Transacciones](docs/transaccionesSolana_2.png)
+![Transacciones](docs/transaccionesSolana.png)
 
 
 
