@@ -51,3 +51,8 @@ Evento AtencionRegistrada: {
   total: '2000000',
   slot: 525296945
 }
+![Registro de Clientas](docs/pruebaSalonRegistroClienta.png)
+![Test](docs/testSalon.png)
+![Trasacciones](docs/transaccionesSolana.png)
+
+
