@@ -1,60 +1,53 @@
-# Biblioteca en Solana
+# 💅 Estética Glamour On-Chain — Gestión de Salón de Belleza en Solana
 
-![banner](./images/banner-biblioteca.jpg)
+Programa inteligente (Smart Contract) desarrollado en **Rust** con el framework **Anchor** sobre la blockchain de **Solana (Devnet)**. Permite administrar de forma descentralizada, transparente e inmutable el catálogo de servicios, la base de clientes y el historial de atenciones de un salón de belleza.
 
-CRUD básico de un Solana Program desarrollado con Rust y Anchor desde el Solana Playground. 
+* **Program ID (Devnet):** `9zvgE4ipWXMGQdTuVfQh4herMB2FvEGVAjbhW9xeTtAq`
+* **Cuenta PDA del Salón:** `6JULy1Lotyj2ZQwfq3QPxDU6RaDRm517V214ot8trHwD`
+* **Wallet Propietaria (Owner):** `BwkyZRKTiDgpFVbsjzrQiY9SLMeY2qSvMPZGF8f8q1jP`
+* **Ver contrato en Solana Explorer (Devnet):** [Explorar Program ID](https://explorer.solana.com/address/9zvgE4ipWXMGQdTuVfQh4herMB2FvEGVAjbhW9xeTtAq?cluster=devnet)
+* **Ver cuenta PDA en Solana Explorer (Devnet):** [Explorar Estado PDA](https://explorer.solana.com/address/6JULy1Lotyj2ZQwfq3QPxDU6RaDRm517V214ot8trHwD?cluster=devnet)
+* **Probar en Solana Playground:** [Abrir proyecto en SolPG](https://beta.solpg.io/github.com/melek-eyzaguirre-dev/Estetica-Glamour-OnChain)
 
-Puedes comenzar dándole Fork a este repositorio (abajo te explicamos como 👇), **hemos preparado un entorno de codespaces listo para que no tengas que instalar nada**, solo déjate llevar por la fluidez de los ejercicios y temas desarrollados especialmente para ti. 
+---
 
-Asegúrate de clonar este repositorio a tu cuenta usando el botón **`Fork`**.
+## 🎯 Propósito y Problema que Resuelve (Dolor que Cura)
 
-![fork](./images/fork.png)
+* **¿Qué dolor cura?** Elimina la pérdida de registros, la falta de trazabilidad en las atenciones diarias y la dependencia de cuadernos físicos o sistemas centralizados costosos. Garantiza que cada servicio prestado, actualización de tarifas y visita de cliente quede respaldado criptográficamente en la blockchain, evitando alteraciones no autorizadas por terceros.
+* **¿A quién está orientado?** A **estilistas independientes, salones de belleza, centros de estética, barberías y estudios de manicure** que buscan digitalizar su operación, medir la demanda real por servicio y mantener un historial verificable de fidelización de clientes sin intermediarios.
 
-## Importando el proyecto 
+---
 
-Ya con el repositorio en tu cuenta lo siguiente que debes hacer copiar el `enlace de tu repositorio`, lo que se puede hacer directamente desdel navegador:
+## 🏗️ Arquitectura e Instrucciones
 
-![repo](./images/repo.png)
-Posteriormente, lo uniremos con el siguiente enlace en nuestro navegador de preferencia:
+El contrato utiliza una **PDA (Program Derived Address)** determinística derivada con las semillas `["salon_belleza", owner]`, asegurando que cada propietario tenga una única cuenta aislada y que solo su wallet (`Signer`) pueda modificar el estado.
 
-```url
-https://beta.solpg.io/
-```
+* `crear_salon`: Inicializa la cuenta PDA del salón asociada al propietario.
+* `agregar_servicio` / `eliminar_servicio`: Gestiona el catálogo de servicios (nombre y precio en lamports).
+* `alterar_servicio` / `actualizar_precio`: Activa o pausa la disponibilidad de un servicio y actualiza tarifas.
+* `registrar_cliente`: Incorpora nuevos clientes al registro del salón.
+* `registrar_atencion`: Registra una atención realizada, incrementando el contador de servicios prestados (`realizados`), las visitas del cliente (`visitas`) y su gasto acumulado (`gastado_total`), emitiendo eventos on-chain (`AtencionRegistrada`).
 
-Lo que nos dará algo parecido a:
+---
 
-![url](./images/url.png)
+## ✅ Evidencia de Funcionamiento en Solana Devnet
 
-Al pulsar enter seremos enviados al `Solana Playground` con nuestro proyecto abierto:
+### 1. Log de Ejecución del Cliente (`client.ts`) y Eventos Emitidos
 
-![pg](./images/pg.png)
-
-Para guardarlo solo damos clic en el boton `import` y asignamos un nombre:
-
-![import](./images/import.png)
-
-## Preparacion del entorno
-
-Primero conectaremos el entorno con la devnet, lo que tambien procederá a la creación de una wallet. Para eso daremos clic en donde dice **Not Conected**:
-
-![playground1](./images/playground1.png)
-
-Saldrá la siguiente ventana donde daremos en el botón **Continue**:
-
-![wallet](./images/wallet.png)
-
-Como resultado se mostrará la siguiente información:
-
-![status](./images/status.png)
-
-* En verde: el estado de la conexión y el entorno al que se encuentra conectado
-
-* En amarillo: la la dirección de la wallet conectada
-
-* En azul: la cantidad de tokens en la wallet
-
-> ℹ️ ¿Quieres ver el ejemplo de un "Hola Mundo" en Solana?. Da clic aquí: 👉 [Ver Ejemplo](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/build-deploy)
-
-> ℹ️ ¿Cuentas con una Wallet de [Phantom](https://phantom.com/) que deseas importar?, Da clic aquí para ver como hacerlo: 
-
-👉 [Como Importar una Wallet](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/import-key-a-playground)
+```text
+Wallet activa: BwkyZRKTiDgpFVbsjzrQiY9SLMeY2qSvMPZGF8f8q1jP
+Balance: 8.57016712 SOL
+Salón de Belleza PDA: 6JULy1Lotyj2ZQwfq3QPxDU6RaDRm517V214ot8trHwD
+-- crear_salon: ya existe, continuando...
+-- agregar_servicio
+Evento ServicioAgregado: { nombre: 'Corte y Brushing', precio: '2000000', slot: 525296939 }
+-- registrar_cliente
+Evento ClienteRegistrado: { nombre: 'Camila', slot: 525296942 }
+-- registrar_atencion
+Evento AtencionRegistrada: {
+  cliente: 'Camila',
+  servicio: 'Corte y Brushing',
+  cantidad: 1,
+  total: '2000000',
+  slot: 525296945
+}
