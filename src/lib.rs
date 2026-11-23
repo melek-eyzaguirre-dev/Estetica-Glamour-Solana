@@ -18,7 +18,7 @@ PDA:
 use anchor_lang::prelude::*;
 
 // Recuerda reemplazar este ID con el que te genere Solana Playground al hacer Build
-declare_id!("11111111111111111111111111111111");
+declare_id!("9zvgE4ipWXMGQdTuVfQh4herMB2FvEGVAjbhW9xeTtAq");
 
 #[program]
 pub mod salon_belleza {
