@@ -66,3 +66,16 @@ Resumen estado: {
     gastadoTotal: '3000000'
   }
 }
+###  Capturas de Pantalla (Evidencia Visual)
+
+#### Wallet Activa y Balance en Devnet
+![Wallet Activa](docs/walletActiva.png)
+
+#### Registro de Clientas y Estado On-Chain
+![Registro de Clientas](docs/pruebaSalonRegistroClienta.png)
+
+#### Pruebas End-to-End (`anchor.test.ts` — 1 passing)
+![Test](docs/testSalon.png)
+
+#### Transacciones Confirmadas en Devnet
+![Transacciones](docs/transaccionesSolana_2.png)
