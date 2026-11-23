@@ -51,3 +51,18 @@ Evento AtencionRegistrada: {
   total: '2000000',
   slot: 525296945
 }
+Resumen estado: {
+  nombre: 'Estética Glamour',
+  clientes: 3,
+  primerServicio: {
+    nombre: 'Manicure Gel',
+    precio: '3000000',
+    realizados: 1,
+    disponible: true
+  },
+  primerCliente: {
+    nombre: 'Valentina',
+    visitas: 1,
+    gastadoTotal: '3000000'
+  }
+}
