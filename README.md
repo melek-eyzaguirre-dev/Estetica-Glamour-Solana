@@ -32,7 +32,7 @@ El contrato utiliza una **PDA (Program Derived Address)** determinística deriva
 
 ## ✅ Evidencia de Funcionamiento en Solana Devnet
 
-### 1. Log de Ejecución del Cliente (`client.ts`) y Eventos Emitidos
+###  Log de Ejecución del Cliente (`client.ts`) y Eventos Emitidos
 
 ```text
 Wallet activa: BwkyZRKTiDgpFVbsjzrQiY9SLMeY2qSvMPZGF8f8q1jP
